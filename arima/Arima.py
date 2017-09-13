@@ -51,11 +51,11 @@ def train_test_arima(df, file_name):
     val = df[train_len+1:len(df)-test_len]
     test = df[train_len+val_len+1:len(df)]
     
-    p_values = [0, 1]
+    p_values = [0, 1, 2]
     d_values = [0, 1, 2] 
     q_values = [0, 1, 2]
             
-    #order = (0, 0, 1)
+    #order = (0, 1, 0)
     order = evaluate_models(train, val, p_values, d_values, q_values)
     
     modelo[0] = [order[0], order[1], order[2]]
@@ -63,21 +63,31 @@ def train_test_arima(df, file_name):
     df_modelo = pd.DataFrame(data = modelo, columns=['p', 'd', 'q'])
     df_modelo.to_csv('ARIMA/ordens/'+file_name, header=True, index= False)
 
+
+    lags = 5
     #-----------------Treinamento----------------------------------
-    model = ARIMA(train, order=order)
-    results_AR = model.fit(disp=-1)
-    pred_train = results_AR.fittedvalues
+    y = train[0:lags]
+    hist = [x for x in y]
+    pred_train = []
+    for i in range(len(train)-lags):    
+        hist.append(train[i+lags])
+        model = ARIMA(hist, order=order)
+        results_AR = model.fit(disp=-1)
+        pred_train.append(results_AR.forecast()[0])
         
     df_train = pd.DataFrame(data=Save(train, pred_train))
     df_train.to_csv('ARIMA/treinamento/'+file_name, header=False, index= False)
 
-    mse_train = mean_squared_error(train, pred_train)
+    mse_train = mean_squared_error(train[lags:], pred_train)
     rmse_train = np.sqrt(mse_train)
 
     #-----------------Validação----------------------------------
-    model = ARIMA(val, order=order)
-    results_AR = model.fit(disp=-1)
-    pred_val = results_AR.fittedvalues
+    pred_val = []
+    for i in range(len(val)):
+        model = ARIMA(hist, order=order)
+        results_AR = model.fit(disp=-1)
+        pred_val.append(results_AR.forecast()[0])
+        hist.append(val[i])
         
     df_val = pd.DataFrame(data=Save(val, pred_val))
     df_val.to_csv('ARIMA/validação/'+file_name, header=False, index= False)
@@ -86,9 +96,12 @@ def train_test_arima(df, file_name):
     rmse_val = np.sqrt(mse_val)
     
     #-----------------Teste----------------------------------
-    model = ARIMA(test, order=order)
-    results_AR = model.fit(disp=-1)
-    pred_test = results_AR.fittedvalues
+    pred_test = []
+    for i in range(len(test)):
+        model = ARIMA(hist, order=order)
+        results_AR = model.fit(disp=-1)
+        pred_test.append(results_AR.forecast()[0])
+        hist.append(test[i])
     
     df_test = pd.DataFrame(data=Save(test, pred_test))
     df_test.to_csv('ARIMA/teste/'+file_name, header=False, index= False)
@@ -139,8 +152,12 @@ def evaluate_models(train_x, val_x, p_values, d_values, q_values):
 
     return best_cfg
     
-files = ["NN3-001", "NN3-002", "NN3-003", "NN3-004", "NN3-005", "NN3-006", "NN3-007", "NN3-008", "NN3-009", "NN3-010",
-          "NN3-011", "NN3-012", "NN3-013", "NN3-014", "NN3-015", "NN3-016", "NN3-017", "NN3-018", "NN3-019", "NN3-020"]          
+#FEITO
+#"NN3-001", "NN3-002", "NN3-003", "NN3-004", "NN3-005", "NN3-006", "NN3-012", "NN3-015", "NN3-016", "NN3-017", "NN3-018", "NN3-019", 
+#"NN3-011", "NN3-014", "NN3-008", "NN3-020", "NN3-007", "NN3-009", "NN3-010", "NN3-013"
+
+files = [ "NN3-001", "NN3-002", "NN3-003", "NN3-004", "NN3-005", "NN3-006", "NN3-007", "NN3-008", "NN3-009", "NN3-010",
+          "NN3-011", "NN3-012", "NN3-013""NN3-014", "NN3-015", "NN3-016", "NN3-017", "NN3-018", "NN3-019", "NN3-020"]          
           
 for i in files:
     df = load_files(i)
