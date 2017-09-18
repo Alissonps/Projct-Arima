@@ -21,11 +21,19 @@ def load_files(file_name):
     
     return df
 
+def Plot(real, pred):
+    
+    plt.plot(real, "Blue")
+    plt.plot(pred, "Green")
+    plt.show()
+
 def Save(real, pred):
     
     #plt.plot(real, "Blue")
     #plt.plot(pred, "Green")
     #plt.show()
+    print(len(real))
+    print(len(pred))
     
     matrix = np.zeros((len(pred), 2))
     
@@ -34,6 +42,16 @@ def Save(real, pred):
         matrix[i] = [real[i], pred[i]]
         
     return matrix
+
+def Load_order(file_name):
+    
+    dtf_serie = pd.read_csv('./ARIMA/ordens/'+file_name, usecols=[0,1,2])
+    order = dtf_serie.values
+    order = order.astype('int')
+    order[0][0] = 1
+    print("Ordem do modelo: " , order)
+    
+    return order
     
 def train_test_arima(df, file_name):
     
@@ -50,13 +68,10 @@ def train_test_arima(df, file_name):
     train =  df[0:train_len]
     val = df[train_len+1:len(df)-test_len]
     test = df[train_len+val_len+1:len(df)]
-    
-    p_values = [0, 1, 2]
-    d_values = [0, 1, 2] 
-    q_values = [0, 1, 2]
             
-    #order = (0, 1, 0)
-    order = evaluate_models(train, val, p_values, d_values, q_values)
+    ordem = Load_order(file_name)
+    order = (ordem[0][0], ordem[0][1], ordem[0][2])
+    #order = evaluate_models(train, val, p_values, d_values, q_values)
     
     modelo[0] = [order[0], order[1], order[2]]
 
@@ -66,29 +81,25 @@ def train_test_arima(df, file_name):
 
     lags = 5
     #-----------------Treinamento----------------------------------
-    y = train[0:lags]
-    hist = [x for x in y]
     pred_train = []
-    for i in range(len(train)-lags):    
-        hist.append(train[i+lags])
-        model = ARIMA(hist, order=order)
-        results_AR = model.fit(disp=-1)
-        pred_train.append(results_AR.forecast()[0])
+
+    model = ARIMA(train, order=order)
+    model_fit = model.fit(disp=-1)
+    pred_train = model_fit.fittedvalues
         
     df_train = pd.DataFrame(data=Save(train, pred_train))
     df_train.to_csv('ARIMA/treinamento/'+file_name, header=False, index= False)
 
-    mse_train = mean_squared_error(train[lags:], pred_train)
+    mse_train = mean_squared_error(train, pred_train)
     rmse_train = np.sqrt(mse_train)
 
     #-----------------Validação----------------------------------
     pred_val = []
-    for i in range(len(val)):
-        model = ARIMA(hist, order=order)
-        results_AR = model.fit(disp=-1)
-        pred_val.append(results_AR.forecast()[0])
-        hist.append(val[i])
-        
+    
+    pred_val = model_fit.predict(end=val_len-2, exog=val) 
+
+    #Plot(val, pred_val)
+           
     df_val = pd.DataFrame(data=Save(val, pred_val))
     df_val.to_csv('ARIMA/validação/'+file_name, header=False, index= False)
 
@@ -97,18 +108,17 @@ def train_test_arima(df, file_name):
     
     #-----------------Teste----------------------------------
     pred_test = []
-    for i in range(len(test)):
-        model = ARIMA(hist, order=order)
-        results_AR = model.fit(disp=-1)
-        pred_test.append(results_AR.forecast()[0])
-        hist.append(test[i])
+
+    pred_test = model_fit.predict(end=test_len-2, exog=test)
+    
+    #Plot(test, pred_test)
     
     df_test = pd.DataFrame(data=Save(test, pred_test))
     df_test.to_csv('ARIMA/teste/'+file_name, header=False, index= False)
 
     mse_test = mean_squared_error(test, pred_test)
     rmse_test = np.sqrt(mse_test)
-    
+
     erros[0] = [mse_train, rmse_train, mse_val, rmse_val, mse_test, rmse_test]
     
     return erros
@@ -152,12 +162,11 @@ def evaluate_models(train_x, val_x, p_values, d_values, q_values):
 
     return best_cfg
     
-#FEITO
-#"NN3-001", "NN3-002", "NN3-003", "NN3-004", "NN3-005", "NN3-006", "NN3-012", "NN3-015", "NN3-016", "NN3-017", "NN3-018", "NN3-019", 
-#"NN3-011", "NN3-014", "NN3-008", "NN3-020", "NN3-007", "NN3-009", "NN3-010", "NN3-013"
+#files = ["NN3-001", "NN3-007", "NN3-008", "NN3-009", "NN3-010", "NN3-012", "NN3-013", "NN3-018", "NN3-019", "NN3-020"]          
 
-files = [ "NN3-001", "NN3-002", "NN3-003", "NN3-004", "NN3-005", "NN3-006", "NN3-007", "NN3-008", "NN3-009", "NN3-010",
-          "NN3-011", "NN3-012", "NN3-013""NN3-014", "NN3-015", "NN3-016", "NN3-017", "NN3-018", "NN3-019", "NN3-020"]          
+files = ["NN3-002", "NN3-004", "NN3-005", "NN3-006", "NN3-011", "NN3-014", "NN3-015", "NN3-016", "NN3-017"]          
+
+
           
 for i in files:
     df = load_files(i)
