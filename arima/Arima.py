@@ -10,12 +10,38 @@ import matplotlib.pylab as plt
 from sklearn.metrics import mean_squared_error
 from statsmodels.tsa.arima_model import ARIMA
 from sklearn import preprocessing
-#from statsmodels.tsa.x13 import x13_arima_select_order
+from statsmodels.tsa.stattools import adfuller
+from datetime import datetime
+
+
+def test_stationarity(timeseries):
+    
+    #Determing rolling statistics
+    rolmean = pd.rolling_mean(timeseries, window=2)
+    rolstd = pd.rolling_std(timeseries, window=2)
+
+    #Plot rolling statistics:
+    orig = plt.plot(timeseries, color='blue',label='Original')
+    mean = plt.plot(rolmean, color='red', label='Rolling Mean')
+    std = plt.plot(rolstd, color='black', label = 'Rolling Std')
+    plt.legend(loc='best')
+    plt.title('Rolling Mean & Standard Deviation')
+    plt.show(block=True)
+    
+    #Perform Dickey-Fuller test:
+    print ('Results of Dickey-Fuller Test:')
+    dftest = adfuller(timeseries, autolag='AIC')
+    dfoutput = pd.Series(dftest[0:4], index=['Test Statistic','p-value','#Lags Used','Number of Observations Used'])
+    for key,value in dftest[4].items():
+        dfoutput['Critical Value (%s)'%key] = value
+    
+    print (dfoutput)
 
 def load_files(file_name):
 
     print("Load File " + file_name)
     serie = np.loadtxt('./data/'+file_name+'.txt')
+    
     dtf_serie = pd.DataFrame(serie)
     df = dtf_serie.values
     
@@ -49,55 +75,61 @@ def Load_order(file_name):
     order = dtf_serie.values
     order = order.astype('int')
     order[0][0] = 1
-    print("Ordem do modelo: " , order)
+    print("Ordem do modelo: ", order)
     
     return order
     
 def train_test_arima(df, file_name):
     
-    modelo = np.zeros((1, 3))
+    #modelo = np.zeros((1, 3))
     erros = np.zeros((1,6))
-    len_serie = len(df)
-    scaler = preprocessing.MinMaxScaler()
-    df = scaler.fit_transform(df)
     
+    len_serie = len(df)
+    
+    scaler = preprocessing.MinMaxScaler()
+    ts_log = scaler.fit_transform(df)
+        
     train_len = round(len_serie * 0.6)
     val_len = round(len_serie * 0.2)
     test_len = round(len_serie * 0.2)
     
-    train =  df[0:train_len]
-    val = df[train_len+1:len(df)-test_len]
-    test = df[train_len+val_len+1:len(df)]
+    train =  ts_log[0:train_len]
+    val = ts_log[train_len+1:len(df)-test_len]
+    test = ts_log[train_len+val_len+1:len(df)]
             
     ordem = Load_order(file_name)
+
     order = (ordem[0][0], ordem[0][1], ordem[0][2])
+    
+    #p_values = [1] 
+    #d_values = [0, 1]
+    #q_values = [1, 2]
     #order = evaluate_models(train, val, p_values, d_values, q_values)
     
-    modelo[0] = [order[0], order[1], order[2]]
+    #modelo[0] = [order[0], order[1], order[2]]
 
-    df_modelo = pd.DataFrame(data = modelo, columns=['p', 'd', 'q'])
-    df_modelo.to_csv('ARIMA/ordens/'+file_name, header=True, index= False)
+    #df_modelo = pd.DataFrame(data = modelo, columns=['p', 'd', 'q'])
+    #df_modelo.to_csv('ARIMA/ordens/'+file_name, header=True, index= False)
 
 
-    lags = 5
     #-----------------Treinamento----------------------------------
-    pred_train = []
 
     model = ARIMA(train, order=order)
-    model_fit = model.fit(disp=-1)
+    model_fit = model.fit(disp=-1, typ='levels')
     pred_train = model_fit.fittedvalues
-        
-    df_train = pd.DataFrame(data=Save(train, pred_train))
+    
+    
+    df_train = pd.DataFrame(data=Save(train[1:], pred_train))
     df_train.to_csv('ARIMA/treinamento/'+file_name, header=False, index= False)
 
-    mse_train = mean_squared_error(train, pred_train)
+    mse_train = mean_squared_error(train[1:], pred_train)
     rmse_train = np.sqrt(mse_train)
+    
+    Plot(train, pred_train)
 
     #-----------------Validação----------------------------------
-    pred_val = []
     
-    pred_val = model_fit.predict(end=val_len-2, exog=val) 
-
+    pred_val = model_fit.predict(end=val_len-1, exog=val) 
     #Plot(val, pred_val)
            
     df_val = pd.DataFrame(data=Save(val, pred_val))
@@ -107,11 +139,10 @@ def train_test_arima(df, file_name):
     rmse_val = np.sqrt(mse_val)
     
     #-----------------Teste----------------------------------
-    pred_test = []
 
-    pred_test = model_fit.predict(end=test_len-2, exog=test)
-    
-    #Plot(test, pred_test)
+    pred_test = model_fit.predict(end=test_len-1, exog=test)
+
+    Plot(test, pred_test)
     
     df_test = pd.DataFrame(data=Save(test, pred_test))
     df_test.to_csv('ARIMA/teste/'+file_name, header=False, index= False)
@@ -124,6 +155,7 @@ def train_test_arima(df, file_name):
     return erros
 
 # evaluate an ARIMA model for a given order (p,d,q)
+
 def evaluate_arima_model(train_x, val_x, arima_order):
     # prepare training dataset
     train_size = len(train_x)
@@ -162,18 +194,19 @@ def evaluate_models(train_x, val_x, p_values, d_values, q_values):
 
     return best_cfg
     
-#files = ["NN3-001", "NN3-007", "NN3-008", "NN3-009", "NN3-010", "NN3-012", "NN3-013", "NN3-018", "NN3-019", "NN3-020"]          
 
-files = ["NN3-002", "NN3-004", "NN3-005", "NN3-006", "NN3-011", "NN3-014", "NN3-015", "NN3-016", "NN3-017"]          
+files = ["NN3-001", "NN3-002", "NN3-003", "NN3-004", "NN3-005", "NN3-006", "NN3-007", "NN3-008", "NN3-009", "NN3-010", "NN3-011", "NN3-012", "NN3-013", "NN3-014", "NN3-015", "NN3-017","NN3-018", "NN3-019", "NN3-020"]
 
-
-          
+#files = ["NN3-016"]
+           
 for i in files:
     df = load_files(i)
     file = i +'.csv'
     res = train_test_arima(df, file)
     print(res)
     df_erros = pd.DataFrame(data = res, columns=['MSE_train', 'RMSE_train', 'MSE_val', 'RMSE_val', 'MSE_test', 'RMSE_test'])
-    #df_erros = pd.DataFrame(data = res, columns=["mse_train"])
     df_erros.to_csv('ARIMA/erros/'+file, header=True, index= False)
     
+# for i in files:
+#     file = i +'.csv'
+#     Load_order(file)
