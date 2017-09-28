@@ -127,11 +127,13 @@ def train_test_arima(df, file_name):
     
     Plot(train, pred_train)
 
+    pred = model_fit.forecast(steps=26)[0]
+
     #-----------------Validação----------------------------------
     
-    pred_val = model_fit.predict(end=val_len-1, exog=val) 
-    #Plot(val, pred_val)
-           
+    pred_val = pred[:val_len-1]
+    Plot(val, pred_val)
+    print(pred_val)       
     df_val = pd.DataFrame(data=Save(val, pred_val))
     df_val.to_csv('ARIMA/validação/'+file_name, header=False, index= False)
 
@@ -140,7 +142,7 @@ def train_test_arima(df, file_name):
     
     #-----------------Teste----------------------------------
 
-    pred_test = model_fit.predict(end=test_len-1, exog=test)
+    pred_test = pred[val_len-1:]
 
     Plot(test, pred_test)
     
@@ -195,9 +197,9 @@ def evaluate_models(train_x, val_x, p_values, d_values, q_values):
     return best_cfg
     
 
-files = ["NN3-001", "NN3-002", "NN3-003", "NN3-004", "NN3-005", "NN3-006", "NN3-007", "NN3-008", "NN3-009", "NN3-010", "NN3-011", "NN3-012", "NN3-013", "NN3-014", "NN3-015", "NN3-017","NN3-018", "NN3-019", "NN3-020"]
+#files = ["NN3-001", "NN3-002", "NN3-003", "NN3-004", "NN3-005", "NN3-006", "NN3-007", "NN3-008", "NN3-009", "NN3-010", "NN3-011", "NN3-012", "NN3-013", "NN3-014", "NN3-015", "NN3-017","NN3-018", "NN3-019", "NN3-020"]
 
-#files = ["NN3-016"]
+files = ["NN3-001"]
            
 for i in files:
     df = load_files(i)
